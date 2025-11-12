@@ -15,7 +15,7 @@ docker build -t 1_data_preprocessing module_1_preprocessing/
 docker build -t 2_model_inference_bev_merging module_2_model_inference/
 docker build -t 3_graph_generation_and_processing module_3_graph_generation/
 docker build -t lanelet2 Lanelet2/
-docker build -t m4_lanelet2_conversion module_4_lanelet2_conversion/
+docker build -t 4_lanelet2_conversion module_4_lanelet2_conversion/
 ```
 
 ---
