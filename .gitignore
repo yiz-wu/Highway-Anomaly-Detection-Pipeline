@@ -1,0 +1,16 @@
+.idea
+.ipynb_checkpoints
+.vscode
+data/
+__pycache__
+experiments
+input/
+output/
+wandb/
+docs/build/
+
+models/warped/*
+!models/warped/__init__.py
+.cursorrules
+venv*/
+linux_venv/

@@ -1,0 +1,78 @@
+{   "mode": "class",
+    "output_root": "/app/output",
+    "dataset": {
+        "images": "/app/input/a1_arese",
+        "img_format": "png",
+        "car_gps": "/app/input/gps.csv",
+        "start": 1050,
+        "end": 1100
+    },
+    "bev": {
+        "camera": {
+            "name": "Camera",
+            "parameters": { "cameraData": {
+                    "intrinsic": {"fx":350.975, "fy":350.975, "cx":335.952, "cy":194.081},
+                    "extrinsic": {"x": 0, "y": 0.06, "z": 1.55, "yaw": 0, "pitch": 0.1125, "roll":0}}}
+        },
+        "view_size": [0, 10, -10, 10],
+        "offset_angle": -90,
+        "resolution": 0.05,
+        "center_of_rotation": [200, 200]
+    },
+    "model": {
+        "path": "/app/custom_models",
+        "name": "RoadStarNetE",
+        "num_classes": 12,
+        "parameters": {
+            "line_classes": 11,
+            "area_classes": 2,
+            "backbone":"efficientnet-b3",
+            "bifpn_activation": false,
+            "decoder_depth": 64,
+            "num_bifpn": 6
+        },
+        "predict_size": [384, 640],
+        "checkpoint": "/app/input/checkpoints/ERoadNet_85_all.pth"
+    },
+    "pixel-mapping": {
+        "parameters": {
+            "symmetric_offset": 4,
+            "angle_mode": "gps",
+            "split_after_frames": 1000
+        },
+        "visualization": {
+            "saveimages": true,
+            "folder": "Images"
+        }
+    },
+    "graph-mapping": {
+        "start": 0,
+        "end": -1,
+        "step": 1,
+        "area_size": [20, 20],
+        "ignore_classes": [11],
+        "min_area_size": 10000,
+        "parser": {
+            "name": "BoxImageParser",
+            "parameters": {
+                "window_height":32,
+                "overlap_pixels": 16,
+                "max_horizontal_box_size":128,
+                "min_box_area":4,
+                "resolution": 0.05
+            }
+        }
+    },
+    "postprocessing": {
+        "min_nodes": 20,
+        "stack": [
+            {
+                "processor":"BoxReplaceProcessor",
+                "parameters": {
+                    "min_cluster_size": 8,
+                    "replace_only": [3]
+                }
+            }
+        ]
+    }
+}
