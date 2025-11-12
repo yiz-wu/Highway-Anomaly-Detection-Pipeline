@@ -4,30 +4,59 @@ import numpy as np
 from numpy.typing import NDArray
 from typing import Tuple
 import os
+import re
 from torchvision.io import read_image, ImageReadMode
+from .utils import sorted_nicely
 
 class SDFLoader(DataLoader):
     """
     Simplified dataset format dataloder
     """
-    def __init__(self, img_path: str, gps_path: str, img_format="png") -> None:
+    def __init__(
+        self,
+        img_path: str,
+        gps_path: str,
+        img_format="png",
+        start_from=0,
+        end_at=None,
+        name_regex=None
+    ) -> None:
         super().__init__()
         self.img_path = img_path
         self.img_format = img_format
-        self.start_from = 0
-        self.end_at = None
+        self.start_from = start_from
+        self.end_at = end_at
+        self.name_regex = name_regex
 
+        # --- Load image file names ---
+        tmp_images = [
+            f for f in os.listdir(self.img_path)
+            if f.lower().endswith(self.img_format.lower())
+        ]
+
+        # Filter images based on regex pattern if provided
+        if self.name_regex is not None:
+            prog = re.compile(self.name_regex)
+            images = [img for img in tmp_images if prog.match(img)]
+        else:
+            images = tmp_images
+
+        # Sort nicely by numeric + lexical order
+        self.images = sorted_nicely(images)
+
+        # --- Load GPS data ---
         with open(gps_path, "r") as fp:
-            lines = fp.readlines()[1:]
+            lines = fp.readlines()[1:]  # skip header
 
-        self.sequence  = []
+        self.sequence = []
         self.gps_positions = []
         self.gps_rotations = []
         for line in lines:
-            seq, x,y,z, yaw, roll, pitch = line.split(",")
+            seq, x, y, z, yaw, roll, pitch = line.strip().split(",")
             self.sequence.append(seq)
-            self.gps_positions.append(np.array([float(x),float(y),float(z)]))
+            self.gps_positions.append(np.array([float(x), float(y), float(z)]))
             self.gps_rotations.append(np.array([float(yaw), float(roll), float(pitch)]))
+            
     
 
 
@@ -79,7 +108,6 @@ class SDFLoader(DataLoader):
         Returns:
             smooth position in meters at the desired frame
         """
-        # TODO: may be added in the future
         raise NotImplementedError
 
     def smooth_heading(self, idx) -> float:
@@ -91,7 +119,6 @@ class SDFLoader(DataLoader):
         Returns:
             smooth rotation in radians at the desired frame
         """
-        # TODO: may be added in the future
         raise NotImplementedError
 
     def restart_from_(self, start_index=0) -> None:

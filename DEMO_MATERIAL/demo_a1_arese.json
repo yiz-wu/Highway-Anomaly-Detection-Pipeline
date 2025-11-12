@@ -76,9 +76,9 @@
         ]
     },
     "lanelet2": {
-        "input_path": "/home/developer/material/demo/GraphMap",
-        "output_file": "/home/developer/material/demo/lanenet_output/lanelet2_map.osm",
-        "annotated_map_path": "/home/developer/material/demo/lanenet_output/",
+        "input_path": "/home/developer/material/demo/output/GraphMap",
+        "output_file": "/home/developer/material/demo/output/lanenet_output/lanelet2_map.osm",
+        "annotated_map_path": "/home/developer/material/demo/output/lanenet_output/",
         "zone_number": 33,
         "zone_letter": "N",
         "car_height": 0.0,
