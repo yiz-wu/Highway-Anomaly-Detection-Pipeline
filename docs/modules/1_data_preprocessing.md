@@ -8,10 +8,10 @@ This step ensures every image in the dataset is spatially synchronized with the 
 ---
 
 ## Input
-| Type | Description | Example Path | Required |
-|------|--------------|---------------|-----------|
-| GPS file | A `.csv` or `.json` file containing fields `sequence, x, y, z, heading, roll, pitch`. | `/app/input/gps_data/demo_gps.csv` | Mandatory |
-| Image folder | Directory containing sequentially numbered camera images. | `/app/input/images/` | Mandatory |
+| Type | Description | Required |
+|------|-------------|----------|
+| GPS file | A `.csv` or `.json` file containing fields `sequence, x, y, z, heading, roll, pitch`. | Mandatory |
+| Image folder | Directory containing sequentially numbered camera images. | Mandatory |
 
 ---
 
@@ -32,14 +32,17 @@ This step ensures every image in the dataset is spatially synchronized with the 
 
 ## Parameters
 
-These parameters are set in the JSON configuration file and control how the module reads the dataset and defines the image range.
+These parameters are defined in the JSON configuration file and determine how the module loads the dataset and identifies the range of images to include in the interpolation.
 
 | Parameter | Description | Default / Example | Required |
-|------------|--------------|-------------------|-----------|
-| `dataset.img_format` | Image format to look for (e.g., `"png"`, `"jpg"`). | `"png"` | Optional |
-| `dataset.name_regex` | Regular expression pattern to extract image sequence numbers from filenames. | e.g. `r"\d+"` | Optional |
-| `dataset.start` | Starting frame index to process. | `1000` | Optional |
-| `dataset.end` | Ending frame index to process. | `1200` | Optional |
+| --------- | ----------- | ----------------- | -------- |
+| `dataset.images` | Path to the folder containing all camera images. The module scans this directory and loads only files matching `img_format`. | `/app/input/a1_arese` | Mandatory |
+| `dataset.car_gps` | Path to the GPS log containing `sequence, x, y, z, heading, roll, pitch`. | `/app/input/gps.csv` | Mandatory |
+| `dataset.img_format` | Image format/extension expected in the folder (e.g., `png`, `jpg`). Only files with this extension are processed. | `png` | Mandatory |
+| `dataset.name_regex` | Regular expression used to extract the numeric frame index from image filenames (without extension). The sequence number **must be the only capture group**. | e.g., `(\d{12})_Rectified_\d+_Cam0` | Optional |
+| `dataset.start` | First frame index to include. If omitted, processes starting from first frame. | `1000` | Optional |
+| `dataset.end` | Last frame index to include. If omitted, processes until the last available frame. | `1200` | Optional |
+
 
 
 ---

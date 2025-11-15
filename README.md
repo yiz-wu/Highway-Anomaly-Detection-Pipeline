@@ -46,7 +46,7 @@ project_root/
 ├── module_3_graph_generation/       ← docker content for graph processing
 ├── module_4_lanelet2_conversion/    ← docker content for lanelet2 conversion
 │
-├── mapping/                         ← shared python package for mapping logic
+├── mapping/                         ← python package for mapping logic
 ├── models/                          ← custom segmentation models
 │
 ├── README.md                        ← this file
@@ -97,11 +97,11 @@ experiment/
 └── configuration.json    ← configuration file used by all modules
 
 ```
->The proposed folder structure is only a suggestion. You can organize your files differently if you prefer, as long as **the paths defined in your configuration file match your chosen layout**.
+>The proposed folder structure is only a suggestion. You can organize your files differently if you prefer, as long as **the paths defined in your configuration file match your chosen layout, as well as how you gonna mount them to docker module**.
 
 
 
-Each docker module has default working directory set at ``/app`` which you could configure in their Dockerfile.
+Each docker module (except for last one) has default working directory set at ``/app`` which you could configure in their Dockerfile.
 
 Example run of one module:
 

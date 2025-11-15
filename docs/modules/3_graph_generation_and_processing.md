@@ -43,7 +43,7 @@ Post-processing is then applied to remove noise and merge or simplify elements, 
 | Parameter | Description | Default / Example | Required |
 |------------|-------------|-------------------|-----------|
 | `dataset.images` | Path to image folder | `/app/input/a1_arese` | Mandatory |
-| `dataset.car_gps` | Path to GPS data file | `/app/input/gps.csv` | Mandatory |
+| `dataset.car_gps` | Path to GPS data file. If an interpolated file with prefix `interpolated_` exists in the same folder, the module loads that file instead.  | `/app/input/gps.csv` | Mandatory |
 | `dataset.img_format` | Image format (e.g., `"png"`, `"jpg"`) | `"png"` | Optional |
 | `dataset.name_regex` | Regular expression to extract frame numbers from image filenames | `r"\d+"` | Optional |
 | `dataset.start` | First frame index to process | `1050` | Optional |

@@ -70,11 +70,8 @@ def interpolate_gps_to_images(gps_path, images_folder, output_path, img_ext="png
     # --- Collect image sequence numbers ---
     image_files = sorted(glob.glob(os.path.join(images_folder, f"*.{img_ext}")))
     image_sequences = []
-
-    if seq_regex is not None:
-        pattern = re.compile(seq_regex)
-    else:
-        pattern = None
+    print(seq_regex)
+    pattern = re.compile(seq_regex) if seq_regex else None
 
     for img in image_files:
         fname = os.path.splitext(os.path.basename(img))[0]
@@ -129,33 +126,46 @@ def interpolate_gps_to_images(gps_path, images_folder, output_path, img_ext="png
 # ---------------- Example usage ----------------
 
 if __name__ == "__main__":
+
     parser = argparse.ArgumentParser(description="Interpolate GPS data to image sequences")
-    # parser.add_argument("--gps_file", required=True, help="Path to GPS file (.csv or .json)")
-    # parser.add_argument("--images_dir", required=True, help="Path to images folder")
-    # parser.add_argument("--img_ext", default="jpg", help="Image file extension (default: jpg)")
-    # args = parser.parse_args()
-    
     parser.add_argument(
         "-i",
         dest="input_path",
-        default="./scripts/config/monza_11/monza_11_mapping.config.json",
-        help="Json preset file path"
+        required=True,
+        help="Path to JSON preset configuration file"
     )
-
     args = parser.parse_args()
-    json_path = str(args.input_path)
 
+    json_path = str(args.input_path)
     if not os.path.exists(json_path):
         print(f"Unable to locate file {json_path}")
         exit(1)
-
     with open(json_path, "r") as fp:
         preset = json.load(fp)
 
 
-    # --- Build output filename automatically ---
-    base, ext = os.path.splitext(os.path.basename(preset["dataset"]["car_gps"]))
-    output_file = f"interpolated_{base}.csv"
-    output_path = os.path.join(os.path.dirname(preset["dataset"]["car_gps"]), output_file)
+    dataset_cfg = preset.get("dataset", {})
+    if not dataset_cfg:
+        raise KeyError("Missing 'dataset' section in preset file.")
 
-    interpolate_gps_to_images(preset["dataset"]["car_gps"], preset["dataset"]["images"], output_path, preset["dataset"]["img_format"])
+    car_gps_path = dataset_cfg.get("car_gps")
+    images_folder = dataset_cfg.get("images")
+    img_format = dataset_cfg.get("img_format")
+    name_regex = dataset_cfg.get("name_regex")
+
+    if not all([car_gps_path, images_folder, img_format]):
+        raise ValueError("Configuration file must define 'car_gps', 'images', and 'img_format' under 'dataset'.")
+
+    # --- Build output filename automatically ---
+    base, _ = os.path.splitext(os.path.basename(car_gps_path))
+    output_file = f"interpolated_{base}.csv"
+    output_path = os.path.join(os.path.dirname(car_gps_path), output_file)
+
+    # --- Run interpolation ---
+    interpolate_gps_to_images(
+        gps_path=car_gps_path,
+        images_folder=images_folder,
+        output_path=output_path,
+        img_ext=img_format,
+        seq_regex=name_regex
+    )
