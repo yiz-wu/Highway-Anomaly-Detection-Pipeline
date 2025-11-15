@@ -50,8 +50,3 @@ def load_custom_models(path="custom_models"):
 
     return models_dict
     
-# # import torchvision models
-# import torchvision.models as tv_models
-# # bring torchvision models into this namespace
-# for name, cls in inspect.getmembers(tv_models, inspect.isfunction):
-#     __current_module.__dict__[name] = cls
