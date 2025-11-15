@@ -389,7 +389,6 @@ pt_map, line_map = create_l2_pointstring(
 lanelets = create_l2_lanelets(lanefinder, line_map, lanelet_subtype, lanelet_location)
 
 # Add data to lenelt map
-# TODO: does it check for duplicates or not?
 l2_map = ll2.LaneletMap()
 
 

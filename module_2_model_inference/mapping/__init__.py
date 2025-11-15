@@ -65,7 +65,6 @@ class BlendMode(Enum):
 from .camera import Camera, LadybugCamera
 from .bev import Bev
 
-# from .pixelchunk import PixelChunk
 from .pixelmap import PixelMap
 
 # graph map

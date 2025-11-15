@@ -1,17 +1,20 @@
 # Module — Lanelet2 Conversion
 
 ## Purpose
-Converts the **GraphMap** generated in the previous step into a **Lanelet2-compliant map**, ready for use in other compatible system.
-The module detects lanes and markings from graph data, translates them into Lanelet2 objects, and exports the results in `.osm` and `.json` formats.
 
+Converts the **GraphMap** generated in the previous step into a **Lanelet2-compliant map**, ready for use in any system or tool that supports Lanelet2.
+The module detects lanes and markings from graph data, converts them into Lanelet2 objects (points, linestrings, lanelets), and exports the results as `.osm` and `.json` files.
 
 ---
 
-## Input
-| Type | Description | Example Path | Required |
-|------|--------------|--------------|-----------|
-| JSON configuration | Configuration file containing the `lanelet2` section | `/app/input/configuration.json` | Mandatory |
-| GraphMap | Directory produced by Module 3 containing processed graph data | `/app/output/GraphMap/` | Mandatory |
+## Input  
+These are the concrete data resources required by this module.  
+Other options (lane size limits, ignored classes, zone, etc.) are read from the JSON configuration file and are documented in the **Parameters** section.
+
+| Type | Description |
+|------|-------------|
+| **JSON configuration** | JSON file containing the `lanelet2` section. It defines where to read the GraphMap from, where to write the Lanelet2 map, which UTM zone to use, tuning parameters for lane extraction, and optional paths for annotated outputs. |
+| **GraphMap folder** | Directory produced by Module 3 that contains the processed graph data (nodes, edges, shapes) representing road markings and lane structures. This is the main input that will be converted into Lanelet2 linestrings and lanelets. |
 
 ---
 
@@ -29,11 +32,12 @@ The module detects lanes and markings from graph data, translates them into Lane
 ---
 
 ## Output
-| File | Description | Example Path |
-|------|--------------|--------------|
-| `lanelet2_map.osm` | Lanelet2-compliant map with road geometries and lanes | `/app/output/lanenet_output/lanelet2_map.osm` |
-| `lanelet2_mapinfo.json` | Metadata containing origin, projection type, and UTM zone | `/app/output/lanenet_output/lanelet2_mapinfo.json` |
-| *(optional)* Annotated graphs | Graphs with lane annotations for inspection | `/app/output/lanenet_output/annotated_graphs/` |
+
+| File                          | Description                                           | Example Path                                       |
+| ----------------------------- | ----------------------------------------------------- | -------------------------------------------------- |
+| `lanelet2_map.osm`            | Lanelet2-compliant map with road geometries and lanes | `/app/output/lanenet_output/lanelet2_map.osm`      |
+| `lanelet2_mapinfo.json`       | Metadata describing projection, origin, and UTM zone  | `/app/output/lanenet_output/lanelet2_mapinfo.json` |
+| *(optional)* Annotated graphs | Graphs tagged with lane and class information         | `/app/output/lanenet_output/annotated_graphs/`     |
 
 ---
 

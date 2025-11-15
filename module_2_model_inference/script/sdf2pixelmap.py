@@ -17,25 +17,22 @@ def name2class_map(module):
 # Command args
 
 parser = argparse.ArgumentParser(description='Generate pixel/rgb map from json preset')
-
 parser.add_argument(
     "-i",
     dest="config_file",
-    default="monza_11_mapping.config.json",
-    help="Json preset file path"
+    required=True,
+    help="Path to JSON preset configuration file"
 )
-
 args = parser.parse_args()
-json_path = str(args.config_file)
 
+json_path = str(args.config_file)
 if not os.path.exists(json_path):
     print(f"Unable to locate file {json_path}")
     exit(1)
-
 with open(json_path, "r") as fp:
     preset = json.load(fp)
 
-mode = preset["mode"]
+mode = preset.get("mode")
 print(f"Using preset: {json_path} - {mode} mode")
 
 ################################################################################
@@ -43,25 +40,28 @@ print(f"Using preset: {json_path} - {mode} mode")
 
 from mapping.dataloader import SDFLoader
 
-dt_preset = preset["dataset"]
+dataset_cfg = preset.get("dataset")
 
-car_gps_path = dt_preset["car_gps"]
+car_gps_path = dataset_cfg.get("car_gps")
+images_folder = dataset_cfg.get("images")
+img_format = dataset_cfg.get("img_format")
+name_regex = dataset_cfg.get("name_regex")
+start_idx = dataset_cfg.get("start", None)
+end_idx = dataset_cfg.get("end", None)
+
 interpolated_path = os.path.join(os.path.dirname(car_gps_path), f"interpolated_{os.path.basename(car_gps_path)}")
 if os.path.exists(interpolated_path):
     car_gps_path = interpolated_path
 
 dataloader = SDFLoader(
-    dt_preset["images"],
+    images_folder,
     car_gps_path,
-    dt_preset["img_format"] if "img_format" in dt_preset else "png",
-    name_regex=dt_preset.get("name_regex", None)
+    img_format,
+    name_regex
 )
 
-start_idx = dt_preset.get("start", None)
 if start_idx is not None:
     dataloader.restart_from_(start_idx)
-
-end_idx = dt_preset.get("end", None)
 if end_idx is not None:
     dataloader.end_at_(end_idx)
 
@@ -72,14 +72,24 @@ print(f"Found {len(dataloader)} frames")
 from mapping import Bev
 import mapping.camera as mca
 
-
 valid_cameras = name2class_map(mca)
 
-bev_preset = preset["bev"]
-cam_preset = bev_preset["camera"]
-cam = valid_cameras[cam_preset["name"]](**cam_preset["parameters"])
+bev_cfg = preset.get("bev")
+offset_angle = bev_cfg.get("offset_angle", 0)
+center_of_rotation = bev_cfg.get("center_of_rotation")
+mask_bev = bev_cfg.get("mask_bev")
+view_size = bev_cfg.get("view_size")
+resolution = bev_cfg.get("resolution")
 
-bev_obj = Bev(cam, bev_preset["view_size"], bev_preset["resolution"])
+cam_cfg = bev_cfg.get("camera")
+cam_name = cam_cfg.get("name")
+cam_parameters = cam_cfg.get("parameters")
+if cam_parameters is None:
+    raise ValueError("Camera configuration missing required 'parameters' section.")
+
+cam = valid_cameras[cam_name](**cam_parameters)
+bev_obj = Bev(cam, view_size, resolution)
+
 
 
 ################################################################################
@@ -99,34 +109,42 @@ if mode == "class":
         print("Using CPU")
         model_device = torch.device("cpu")
 
-    model_preset = preset["model"]
+    model_cfg = preset.get("model")
+    custom_model_path = model_cfg.get("path","/app/custom_models")
+    model_name = model_cfg.get("name")
+    model_parameters = model_cfg.get("parameters")
+    if model_parameters is None:
+        raise ValueError("Model configuration missing required 'parameters' section.")
+    model_checkpoint = model_cfg.get("checkpoint")
+    model_num_classes = model_cfg.get("num_classes")
+    model_predict_size = model_cfg.get("predict_size", [384, 640])
 
     valid_modes = name2class_map(models)
-    valid_modes.update(models.load_custom_models(model_preset.get("path","/app/custom_models")))
+    valid_modes.update(models.load_custom_models(custom_model_path))
 
-    model = valid_modes[model_preset["name"]](**model_preset["parameters"])
+    model = valid_modes[model_name](**model_parameters)
     # support jit or other strange loading inside warped model constructors
 
-    if "checkpoint" in model_preset and model_preset["checkpoint"] is not None:
-        model.load_state_dict(torch.load(model_preset["checkpoint"],map_location=model_device))
+    if model_checkpoint:
+        model.load_state_dict(torch.load(model_checkpoint, map_location=model_device))
     model.to(model_device)
     model.eval()
 
     predictor = SDFPredictor(
         model,
         bev_obj,
-        model_preset["num_classes"],
+        model_num_classes,
         device=model_device,
-        bev_to_forward=bev_preset["offset_angle"] if "offset_angle" in bev_preset else 0,
-        bev_rotation_center=tuple(bev_preset["center_of_rotation"]),
-        predict_at=tuple(model_preset["predict_size"]) if "predict_size" in model_preset else (384, 640)
+        bev_to_forward=offset_angle,
+        bev_rotation_center=tuple(center_of_rotation),
+        predict_at=tuple(model_predict_size)
     )
 elif mode == "RGB":
     # car masking is not supported in this simplified mode
     predictor = RGBPredictor(
         bev_obj,
-        bev_preset["offset_angle"] if "offset_angle" in bev_preset else 0,
-        tuple(bev_preset["center_of_rotation"])
+        offset_angle,
+        tuple(center_of_rotation)
     )
 
 ################################################################################
@@ -134,11 +152,11 @@ elif mode == "RGB":
 
 bev_mask = None
 
-if "mask_bev" in bev_preset and bev_preset["mask_bev"]:
+if mask_bev:
     tmp = RGBPredictor(
         bev_obj,
-        bev_preset["offset_angle"] if "offset_angle" in bev_preset else 0,
-        tuple(bev_preset["center_of_rotation"])
+        offset_angle,
+        tuple(center_of_rotation)
     )
     timg, _, _ = dataloader[int(len(dataloader)/2)]
     bev_mask = tmp.predict_bev(timg).sum(-1) > 0
@@ -151,10 +169,10 @@ if "mask_bev" in bev_preset and bev_preset["mask_bev"]:
 import shutil
 from mapping import PixelMap, BlendMode, SmoothMode
 
-map_preset = preset["pixel-mapping"]
+map_preset = preset.get("pixel-mapping")
 
 out_name = "PixelMap" if mode == "class" else "PixelMapRGB"
-out_path = os.path.join(preset["output_root"], out_name)
+out_path = os.path.join(preset.get("output_root", "/app/output"), out_name)
 
 # clear old map
 if os.path.exists(out_path):
@@ -169,7 +187,7 @@ map.from_dataset(
     distance_weigh_mask = bev_mask,
     blend_mode=BlendMode.ENHANCE_OVERLAP if mode == "class" else BlendMode.AVERAGE,
     smooth_mode=SmoothMode.NONE,
-    **map_preset["parameters"]
+    **map_preset.get("parameters")
 )
 
 ################################################################################
@@ -178,12 +196,12 @@ map.from_dataset(
 # this script does not generate full dataset images because that may
 # crash your machine due to extreme ram usage
 
-if map_preset["visualization"]["saveimages"]:
+if map_preset.get("visualization").get("saveimages"):
     print("Saving chunk images...")
-    img_folder = map_preset["visualization"]["folder"]
+    img_folder = map_preset.get("visualization").get("folder")
 
     save_path = os.path.join(
-        preset["output_root"],
+        preset.get("output_root", "/app/output"),
         img_folder,
         out_name,
         "Chunks",
