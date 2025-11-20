@@ -1,126 +1,244 @@
 
-# **Configuration File Reference (Developer Specification)**
+# Configuration Parameter Reference
 
-This document explains **every field** in the pipeline configuration JSON, along with:
+This document details the `configuration.json` file required to run the pipeline.
 
-* What the parameter means
-* Where it is used in the code
-* Default values
-* Accepted values / ranges
-* Whether it is required
+**Important Path Note:**
+All paths defined here must be **Container Paths**, not Host paths.
 
-Each pipeline module reads **only the section it needs**.
+  * Reference: See [README - Understanding Path Mapping](../README.md) for details.
 
----
+-----
 
-# **Global Parameters**
+## 1\. Global Parameters
 
-| Key  | Description  | Used In  | Default | Accepted Values / Range | Required  |
-| ------------- | --------------------------------------------------------------------------------------------------------- | ----------- | ------------- | ----------------------- | --------- |
-| `mode`  | Defines pipeline operating mode. `"class"` runs segmentation model; `"rgb"` runs visualization-only mode. | Module 2: `script/sdf2pixelmap.py` → controls whether the predictor is `SDFPredictor` or `RGBPredictor`. | `"class"`  | `"class"`, `"rgb"`| Mandatory |
-| `output_root` | Base path where all generated results will be saved. Bind a local volume to this path of container store output in your machine. | All modules | `/app/output` | Any valid path | Mandatory |
+These parameters apply to the pipeline execution environment.
+
+```json
+{
+  "mode": "class",
+  "output_root": "/app/output"
+}
+```
+
+| Key | Description | Default | Required |
+| :--- | :--- | :--- | :--- |
+| `mode` | `"class"`: Runs full segmentation model.<br>`"RGB"`: Visualization-only mode (skips inference). | `"class"` | **Yes** |
+| `output_root` | The destination folder inside the container. Ensure this path is mounted to a volume. | `/app/output` | **Yes** |
 
 
----
+-----
 
-# **Section — `dataset`**
+## 2\. Dataset (`dataset`)
 
-| Key | Meaning | Used In  | Code Locations | Default | Accepted | Required |
-| ------------ | ------------------------------------------------- | ----------- | ----------------------------------- | ------- | ----------------- | -------- |
-| `images`  | Path to raw image folder  | Modules 1–3 | `mapping/dataloader/sdf.py & module_1/script/interpolate_gps.py` | — | Any folder  | Yes|
-| `img_format` | File extension of images  | Modules 1–2 | `mapping/dataloader/sdf.py & module_1/script/interpolate_gps.py` | `"png"` | `"png"`, `"jpg"`  | Yes |
-| `car_gps` | Original or interpolated GPS file  | Modules 1–3 | `mapping/dataloader/sdf.py & module_1/script/interpolate_gps.py` | — | `.csv` or `.json` | Yes|
-| `name_regex` | Regex used to extract frame indices from filename | Modules 1–2 | `mapping/dataloader/sdf.py & module_1/script/interpolate_gps.py`| `\d+`| Any regex| Optional |
-| `start`| First frame index| Modules 1–3 | `mapping/dataloader/sdf.py`| — | ≥ 0| Optional |
-| `end`  | Last frame index | Modules 1–3 | `mapping/dataloader/sdf.py`| — | ≥ start  | Optional |
+Defines the input data source.
 
----
+```json
+"dataset": {
+  "images": "/app/input/images",
+  "car_gps": "/app/input/gps_data.csv",
+  "img_format": "png",
+  "name_regex": "(\\d{12})_Rectified_\\d+_Cam0",
+  "start": 0,
+  "end": 2000
+}
+```
 
-# **Section — `bev`**
+| Key | Description | Accepted Values | Default | Required |
+| :--- | :--- | :--- | :--- | :--- |
+| `images` | Directory containing raw frames. | Container Path | — | **Yes** |
+| `car_gps` | File containing GPS/Pose data. | `.csv`, `.json` | — | **Yes** |
+| `img_format` | Image file extension. | `"png"`, `"jpg"` | `"png"` | **Yes** |
+| `name_regex` | Regex to extract frame index from filenames.<br>The sequence shall be matched by first group. | Valid Regex | `\d+` | No |
+| `start` | First frame index to process. | Integer $\ge 0$ | 0 | No |
+| `end` | Last frame index to process. | Integer $>$ start | -1 (All) | No |
 
-Defines camera calibration and BEV projection.
+-----
 
-| Key | Meaning | Used In | Code Locations | Default | Required |
-| --- | ------- | ------- | -------------- | ------- | -------- |
-| `camera.name` | Camera model class name  | Module 2 | `module_2/script/sdf2pixelmap.py` | — | Yes|
-| `camera.parameters` | parameters required by above camera class (usually fx, fy, cx, cy, position and orientation)| Module 2 | `module_2/script/sdf2pixelmap.py`| —  | Yes|
-| `view_size`| [dist_min, dist_max, -right_max, +left_max]; distances measured in meters in the world frame, they define the portion of world ground plane to be centered on. | Module 2 | `mapping/Bev.py` | —  | Yes|
-| `offset_angle`| angle in deg required to rotate the bev to look at vehicle x axis | Module 2 | `mapping/predictors/*.py` | `-90`| Optional |
-| `resolution`  | Resolution in meter/pixel used to calculate the output image size (meters per pixel) | Module 2 | `mapping/Bev.py` | —  | Yes|
-| `center_of_rotation`| center of rotation used to rotate the bev when generating the map | Module 2 | `mapping/predictors/*.py`| — | Optional |
+## 3\. BEV Projection (`bev`)
 
----
+Defines how camera images are projected onto the Bird's Eye View (BEV) plane.
 
-# **Section — `model`**
+```json
+"bev": {
+  "resolution": 0.05,
+  "view_size": [0.0, 50.0, -15.0, 15.0],
+  "offset_angle": -90,
+  "camera": {
+    "name": "Camera",
+    "parameters": { "cameraData": {
+      "intrinsic": {"fx":350.975, "fy":350.975, "cx":335.952, "cy":194.081},
+      "extrinsic": {"x": 0, "y": 0.06, "z": 1.55, "yaw": 0, "pitch": 0.1125, "roll":0}}}
+  },
+  "center_of_rotation": [200, 200]
+}
+```
 
-| Key| Meaning| Used In  | Code Locations  | Default| Required |
-| -------------- | --------------------------- | -------- | ------------------------------------ | ------------ | -------- |
-| `path`| Path to custom model folder | Module 2 | `module_2/script/sdf2pixelmap.py`  | `""`| Optional |
-| `name`| Model class name| Module 2 | `module_2/script/sdf2pixelmap.py` loaded via reflection  | — | Yes|
-| `num_classes`  | Number of predicted classes | Module 2 | `mapping/predictors/*.py`| — | Yes|
-| `parameters`| Model hyperparameters | Module 2 | `module_2/script/sdf2pixelmap.py` | — | Yes |
-| `predict_size` | resized input dimensions (x,y) | Module 2 | `mapping/predictors/*.py`| `(384, 640)` | Optional |
-| `checkpoint`| Path to model weights | Module 2 | `module_2/script/sdf2pixelmap.py`  | — | Optional |
+| Key | Description | Default | Required |
+| :--- | :--- | :--- | :--- |
+| `resolution` | Meters per pixel in the output map. | — | **Yes** |
+| `view_size` | The ground plane bounds relative to the car: `[min_dist, max_dist, right_bound, left_bound]` (in meters). | — | **Yes** |
+| `offset_angle` | Rotation angle (degrees) to align the BEV with the vehicle X-axis. | `-90` | No |
+| `center_of_rotation`| Specific pivot point for rotation (if not vehicle center). | — | No |
+| `camera.name` | The Python class name for the camera model. | — | **Yes** |
+| `camera.parameters` | Dictionary of parameters (`fx`, `fy`, `cx`, `cy`, etc.) required by the chosen camera class. | — | **Yes** |
 
----
+-----
 
-# **Section — `pixel-mapping`**
+## 4\. Segmentation Model (`model`)
 
-Controls merging of frame-level predictions into a map.
+Configuration for the PyTorch segmentation model.
 
-| Key  | Meaning | Used In  | Code Locations | Default | Required |
-| ------------------------------- | ---------------------- | -------- | ----------------------------------------- | ------- | -------- |
-| `parameters.symmetric_offset`| offset in meters added to any direction. This may be used to center the chunk result or fit cropped parts| Module 2 | `mapping/PixelMap.py`  | 0 | Optional |
-| `parameters.angle_mode`| orientation source  | Module 2 | `mapping/PixelMap.py`  | `ESTIMATED` | Optional |
-| `parameters.split_after_frames` | chunk size | Module 2 | `mapping/PixelMap.py`  | Optional |
-| `visualization.saveimages`| whether save BEV chunk images  | Module 2 | `module_2/script/sdf2pixelmap.py` | `true`  | Optional |
-| `visualization.folder` | name of folder in output root where store maps | Module 2 | `module_2/script/sdf2pixelmap.py`| — | Optional  |
+```json
+"model": {
+  "path": "",
+  "name": "RoadStarNetE",
+  "num_classes": 12,
+  "parameters": {
+      "line_classes": 11,
+      "area_classes": 2,
+      "backbone":"efficientnet-b3",
+      "bifpn_activation": false,
+      "decoder_depth": 64,
+      "num_bifpn": 6
+  },
+  "predict_size": [384, 640],
+  "checkpoint": "/app/input/checkpoints/ERoadNet_85_all.pth"
+}
+```
 
----
+| Key | Description | Default | Required |
+| :--- | :--- | :--- | :--- |
+| `name` | Model class name (dynamically loaded). | — | **Yes** |
+| `num_classes` | Total number of semantic classes the model predicts. | — | **Yes** |
+| `parameters` | Hyperparameters passed to the model constructor. | — | **Yes** |
+| `checkpoint` | Path to the `.pth` weight file. | — | No |
+| `path` | Path to a custom model folder (if not using built-ins). | `""` | No |
+| `predict_size` | Resizes input before inference `[height, width]`. | `[384, 640]` | No |
 
-# **Section — `graph-mapping`**
+-----
 
-Graph extraction from PixelMap.
+## 5\. Pixel Mapping (`pixel-mapping`)
 
-| Key  | Meaning| Used In  | Code Locations| Default | Required |
-| ------------------- | --------------------------- | -------- | ---------------------------------- | ------- | -------- |
-| `start` | start frame  | Module 3 | `mapping/PixelMapIterable.py`| 0 | Optional |
-| `end`| end frame (-1 = full) | Module 3 | `mapping/PixelMapIterable.py` | -1| Optional |
-| `step`  | interation step to jump regions.| Module 3 | `mapping/PixelMapIterable.py` | 1 | Optional |
-| `area_size`| region size in meters taken around every position of the dataloder. | Module 3 | `mapping/PixelMapIterable.py` | [20,20] | Optional |
-| `ignore_classes` | List of class indexes to ignore. | Module 3 | `mapping/PixelMapIterable.py` | [] | Optional |
-| `min_area_size`  | set a minimum area used to clean junk at chunk level | Module 3 | `mapping/PixelMapIterable.py`  | None | Optional |
-| `parser.name` | parser class | Module 3 | `module_3/script/pixel2graph.py`  | — | Yes|
-| `parser.parameters` | parser-specific params| Module 3 | depended by chosen parser | — | Yes|
+Controls how individual frames are stitched into the global pixel map.
 
----
+```json
+"pixel-mapping": {
+  "parameters": {
+    "angle_mode": "gps",
+    "symmetric_offset": 4,
+    "split_after_frames": 1000
+  },
+  "visualization": {
+    "saveimages": true,
+    "folder": "Images"
+  }
+}
+```
 
-# **Section — `postprocessing`**
+| Key | Description | Default | Required |
+| :--- | :--- | :--- | :--- |
+| `parameters.symmetric_offset` | Offset (meters) added to directions (used to center chunks or fit crops). | 0 | No |
+| `parameters.angle_mode` | Orientation source. `"ESTIMATED"` (model) or `"gps"`. | `"ESTIMATED"` | No |
+| `parameters.split_after_frames`| Force a map chunk split after N frames. | None | No |
+| `visualization.saveimages` | If `true`, saves debug images of map chunks. | `true` | No |
+| `visualization.folder` | Subfolder name in `output_root` to store visualization images. | — | No |
 
-Operations to clean and simplify graphs.
+-----
 
-| Key| Meaning  | Used In  | Code Locations  | Default | Required |
-| -------------------- | ----------------------------- | -------- | ------------------------------------ | ------- | -------- |
-| `min_nodes` | minimum nodes to keep a graph | Module 3 | `module_3/script/pixel2graph.py`| 10| Optional |
-| `stack`  | sequence of processors  | Module 3 | list of processors | — | Yes|
-| `stack[].processor`  | processor class name | Module 3 | `mapping/graphs/postprocessing/*.py` | — | Yes|
-| `stack[].parameters` | config for processor | Module 3 | passed to constructor | — | Optional |
+## 6\. Graph Generation (`graph-mapping`)
 
----
+Settings for extracting the graph topology from the Pixel Map.
 
-# **Section — `lanelet2`**
+```json
+"graph-mapping": {
+  "start": 0,
+  "end": -1,
+  "step": 1,
+  "area_size": [20, 20],
+  "ignore_classes": [11],
+  "min_area_size": 10000,
+  "parser": {
+    "name": "BoxImageParser",
+    "parameters": {
+        "window_height": 32,
+        "overlap_pixels": 16,
+        "resolution": 0.05
+    }
+  }
+}
+```
 
-Defines conversion of graph map to Lanelet2.
+| Key | Description | Default | Required |
+| :--- | :--- | :--- | :--- |
+| `start` | Frame index to start processing. | 0 | No |
+| `end` | Frame index to stop processing (-1 = end). | -1 | No |
+| `step` | Iteration step size to jump between regions. | 1 | No |
+| `area_size` | Size of sliding window (in meters) `[x, y]`. | `[20, 20]` | No |
+| `ignore_classes` | List of class IDs to exclude from the graph. | `[]` | No |
+| `min_area_size` | Minimum pixel area to consider a valid region (noise filter). | None | No |
+| `parser.name` | Name of the algorithm class used to skeletonize the map. | — | **Yes** |
+| `parser.parameters` | Dictionary of specific settings for the chosen parser. | — | **Yes** |
 
-| Key| Meaning  | Used In  | Code Locations | Default  | Required |
-| -------------------- | -------------------------------------- | -------- | -------------------------------- | -------------- | -------- |
-| `input_path`| Path to GraphMap input  | Module 4 | `module_4/script/graph2let.py` | —  | Yes|
-| `output_file`  | Output `.osm` file path | Module 4 | `module_4/script/graph2let.py`| —  | Yes|
-| `annotated_map_path` | folder for annotated graphs| Module 4 | `module_4/script/graph2let.py` | —  | Optional |
-| `zone_number`  | UTM zone number| Module 4 | `module_4/script/graph2let.py`  | 33 | Yes|
-| `zone_letter`  | UTM zone letter| Module 4 | `module_4/script/graph2let.py`  | `"N"` | Yes|
-| `car_height`| elevation offset  | Module 4 | `module_4/script/graph2let.py`| 0.0| Optional |
-| `min_lane_size`| minimum lane width| Module 4 | `module_4/script/graph2let.py` | 1.5| Optional |
-| `max_lane_size`| maximum lane width| Module 4 | `module_4/script/graph2let.py`  | 6.0| Optional |
-| `search_tolerance`| tolerance when connecting lanes  | Module 4 | `module_4/script/graph2let.py`  | 0.5| Optional |
-| `ignore_classes`  | classes ignored during lane conversion | Module 4 | `module_4/script/graph2let.py` | `[9,10,13,14]` | Optional |
+-----
+
+## 7\. Post-Processing (`postprocessing`)
+
+A stack of operations to clean the generated graph.
+
+```json
+"postprocessing": {
+  "min_nodes": 10,
+  "stack": [
+    {
+      "processor": "BoxReplaceProcessor",
+      "parameters": { "min_cluster_size": 8, "replace_only": [3] }
+    },
+    {
+      "processor": "SimplifyGraph",
+      "parameters": { "epsilon": 2.0 }
+    }
+  ]
+}
+```
+
+| Key | Description | Default | Required |
+| :--- | :--- | :--- | :--- |
+| `min_nodes` | Graphs with fewer nodes than this will be discarded. | 10 | No |
+| `stack` | An ordered list of processor objects to run sequentially. | — | **Yes** |
+| `stack[].processor` | The class name of the processor to run. | — | **Yes** |
+| `stack[].parameters` | Configuration dictionary for that specific processor. | — | No |
+
+-----
+
+## 8\. Lanelet2 Conversion (`lanelet2`)
+
+Converts the internal graph format to OpenStreetMap (OSM) Lanelet2 format.
+
+```json
+"lanelet2": {
+  "input_path": "/app/output/GraphMap/final_graph.pkl",
+  "output_file": "/app/output/Lanenet_output/map.osm",
+  "annotated_map_path": "/app/output/Lanenet_output/",
+  "zone_number": 33,
+  "zone_letter": "N",
+  "car_height": 0.0,
+  "min_lane_size": 1.5,
+  "max_lane_size": 6.0,
+  "search_tolerance": 0.5,
+  "ignore_classes": [9, 10, 13, 14]
+}
+```
+
+| Key | Description | Default | Required |
+| :--- | :--- | :--- | :--- |
+| `input_path` | Path to the processed graph (`.pkl`). | — | **Yes** |
+| `output_file` | Destination path for the `.osm` file. | — | **Yes** |
+| `annotated_map_path` | Folder to save annotated graph visualizations. | — | No |
+| `zone_number` | UTM Zone Number for georeferencing. | 33 | **Yes** |
+| `zone_letter` | UTM Zone Letter. | `"N"` | **Yes** |
+| `car_height` | Elevation offset (meters) for the map. | 0.0 | No |
+| `min_lane_size` | Minimum lane width (meters). | 1.5 | No |
+| `max_lane_size` | Maximum lane width (meters). | 6.0 | No |
+| `search_tolerance` | Tolerance distance when connecting lanes. | 0.5 | No |
+| `ignore_classes` | List of class IDs ignored during lane conversion. | `[9,10,13,14]` | No |

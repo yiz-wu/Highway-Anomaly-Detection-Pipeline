@@ -80,46 +80,71 @@ To know the details about building process and setting, check the [docker_build.
 
 ## Running the modules
 
-Each module runs as a separate docker container.
-You just need to **mount the input and output folders, and pass the configuration file path inside the container** with `-i`.
+Each module runs as a separate Docker container. You must **mount the input and output folders** from your host machine into the container and pass the configuration file path using `-i`.
 
-An example structure for a folder to be mounted into the container is the following:
+### 1\. Organize your data
 
-```
+An example structure for your experiment folder on your **Host Machine**:
+
+```text
 experiment/
-│
-├── input/                ← contains all input data
-│   ├── images/           ← raw camera frames
-│   └── gps_data.csv      ← GPS or vehicle pose information
-│
-├── output/               ← destination for all generated results
-│
-└── configuration.json    ← configuration file used by all modules
-
+├── input/                  ← (Host Path: /path/to/experiment/input)
+│   ├── images/             
+│   ├── gps_data.csv        
+│   └── configuration.json  
+└── output/                 ← (Host Path: /path/to/experiment/output)
 ```
->The proposed folder structure is only a suggestion. You can organize your files differently if you prefer, as long as **the paths defined in your configuration file match your chosen layout, as well as how you gonna mount them to docker module**.
 
+### 2\. Understand Path Mapping (Crucial)
 
+The configuration file (`configuration.json`) is read **inside** the Docker container. Therefore, all paths defined inside the JSON must point to **Container Paths**, not your Host paths.
 
-Each docker module (except for last one) has default working directory set at ``/app`` which you could configure in their Dockerfile.
+**The Mapping Logic:**
 
-Example run of one module:
+1.  **Host:** You have data at `/path/to/experiment/input`.
+2.  **Mount:** You bind this to `/app/input` inside the container using `-v`.
+3.  **Config:** Your JSON must explicitly use `/app/input`.
 
-```bash
+| Location | Path Example | Usage |
+| :--- | :--- | :--- |
+| **Host Machine** | `/path/to/experiment/input` | Used in the `docker run -v` flag |
+| **Container** | `/app/input` | Used in `configuration.json` |
+
+**Correct Configuration Example:**
+Even though your real images are at `C:/Users/Me/experiment/input/images`, your JSON **must** look like this because of the volume mount:
+
+```json
+{
+  "output_root": "/app/output",        // Points to the mounted container path
+  "dataset": {
+    "images": "/app/input/images",     // NOT /path/to/experiment/input/images
+    "car_gps": "/app/input/gps_data.csv"
+  }
+}
+```
+
+### 3\. Execute
+
+Run the container by mapping the host paths to the container paths defined above.
+
+```powershell
 docker run --rm `
-  -v /path/to/experiment:/app/experiment `
+  -v /path/to/experiment/input:/app/input `    <-- Binds Host path to Container path
+  -v /path/to/experiment/output:/app/output `
   1_data_preprocessing `
-  -i /app/experiment/configuration.json
+  -i /app/input/configuration.json             <-- Configuration file at Container path
 ```
 
 You can then run the other steps one after another:
 
-```bash
+```powershell
 docker run --rm -v ... 1_data_preprocessing -i <path_to_config_file>
 docker run --rm -v ... 2_model_inference_bev_merging -i <path_to_config_file>
 docker run --rm -v ... 3_graph_generation_and_processing -i <path_to_config_file>
 docker run --rm -v ... 4_lanelet2_conversion -i <path_to_config_file>
 ```
+
+### 4\. Output
 
 During pipeline execution, several subfolders will automatically be created inside the `output/` directory, for example:
 
@@ -136,13 +161,20 @@ output/
 ```
 ---
 
-## Configuration file
+## Configuration File
 
-All modules could use the same JSON configuration file.  
-It contains the parameters for every stage, and each module reads only the part it needs (e.g. `dataset`, `bev`, `model`, `lanelet2`, etc.) and ignores the rest.  
-You can reuse the same file for entire pipeline.
+The pipeline relies on a **single, unified JSON configuration file**. You do not need separate files for every step; the entire pipeline can be controlled from one master file.
 
-Example of structure:
+### Structure & Behavior
+
+The configuration is designed with **modularity** in mind. Even though the file contains parameters for every stage, each Docker module automatically extracts **only the section it needs** and ignores the rest.
+
+  * **Section-Based Access:** For example, the **Preprocessing** module reads the `dataset` block, while the **Inference** module reads also the `model` and `bev` blocks.
+  * **Internal Logic:** The main script (e.g., `sdf2pixelmap.py`) parses the JSON into a dictionary object. It then injects specific sub-dictionaries (like `config['bev']`) into the relevant Python classes (e.g., `Bev.py`) via their constructors. This ensures strict module independence and prevents global state issues.
+
+### Example Configuration
+
+Below is the structure of a complete configuration file:
 
 ```json
 {
@@ -161,9 +193,11 @@ Example of structure:
   "postprocessing": { "...": "..." },
   "lanelet2": { "...": "..." }
 }
-````
+```
 
-For the detail of parameters you can check [parameters_reference](docs/parameters_reference.md) or corresponding submodule page.
+> **Detailed Reference:** For a complete explanation of every parameter, valid ranges, and default values, please refer to the [Parameters Reference](docs/parameters_reference.md).
+
+-----
 
 ---
 
